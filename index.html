@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoApply AI - Remote Job Agent & Resume Tailorer</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Automate remote job monitoring, get instant desktop notifications, parse PDF/Word resumes & job descriptions, tailor resumes with AI, and auto-submit applications.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Document Parsers (Mammoth.js and PDF.js) -->
+  <script src="mammoth.browser.min.js"></script>
+  <script src="pdf.min.js"></script>
+  <script>
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+  </script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="glass-header">
+      <div class="brand">
+        <div class="logo-circle">⚡</div>
+        <div class="brand-text">
+          <h1>AutoApply AI</h1>
+          <span class="subtext font-mono">Autonomous Remote Job Agent v1.0.0</span>
+        </div>
+      </div>
+      
+      <div class="global-controls">
+        <button id="btn-notifications" class="btn btn-notify notification-disabled">
+          <span class="bell-icon">🔔</span>
+          <span id="txt-notifications">Enable Alerts</span>
+        </button>
+        <button id="btn-test-notification" class="btn btn-secondary">
+          <span>Test Alert</span>
+        </button>
+        <button id="btn-theme-toggle" class="btn btn-secondary btn-icon-only" title="Toggle Light/Dark Theme" style="font-size: 1rem;">
+          <span id="theme-toggle-icon">☀️</span>
+        </button>
+        <button id="btn-settings" class="btn btn-secondary btn-icon-only" title="Settings">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Ribbon -->
+    <section class="metrics-grid">
+      <div class="metric-card glass">
+        <div class="metric-info">
+          <span class="metric-label">Jobs Scanned</span>
+          <span id="metric-scanned" class="metric-value font-mono">0</span>
+        </div>
+        <div class="metric-icon scan-pulse">📡</div>
+      </div>
+      <div class="metric-card glass">
+        <div class="metric-info">
+          <span class="metric-label">Tailored Resumes</span>
+          <span id="metric-tailored" class="metric-value font-mono">0</span>
+        </div>
+        <div class="metric-icon">📄</div>
+      </div>
+      <div class="metric-card glass">
+        <div class="metric-info">
+          <span class="metric-label">Auto-Applied</span>
+          <span id="metric-applied" class="metric-value font-mono">0</span>
+        </div>
+        <div class="metric-icon apply-pulse">🚀</div>
+      </div>
+      <div class="metric-card glass">
+        <div class="metric-info">
+          <span class="metric-label">Monitor Status</span>
+          <span id="metric-status" class="metric-value font-mono status-active">ACTIVE</span>
+        </div>
+        <div class="metric-icon status-dot">●</div>
+      </div>
+    </section>
+
+    <!-- Main Content Workspace -->
+    <main class="workspace-grid">
+      
+      <!-- Panel 1: Monitor Feed Console (Left Column) -->
+      <section class="panel-card glass" id="console-panel">
+        <div class="panel-header">
+          <h2>Job Monitor Console</h2>
+          <div class="console-controls" style="display: flex; gap: 0.4rem; align-items: center; margin-left: auto; margin-right: 1rem;">
+            <button id="btn-start-monitor" class="btn btn-secondary btn-icon-only" title="Start Monitor" style="width: 28px; height: 28px; padding: 0; font-size: 0.75rem; background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.3); color: var(--success);" disabled>▶</button>
+            <button id="btn-pause-monitor" class="btn btn-secondary btn-icon-only" title="Pause Monitor" style="width: 28px; height: 28px; padding: 0; font-size: 0.75rem; background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.3); color: var(--warning);">⏸</button>
+            <button id="btn-stop-monitor" class="btn btn-secondary btn-icon-only" title="Stop Monitor" style="width: 28px; height: 28px; padding: 0; font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: var(--danger);">⏹</button>
+          </div>
+          <div class="live-indicator">
+            <span class="pulse-dot" id="console-pulse-dot"></span>
+            <span class="status-lbl font-mono" id="console-status-lbl">LISTENING</span>
+          </div>
+        </div>
+        
+        <div class="console-wrapper">
+          <div class="console-log font-mono" id="log-terminal">
+            <div class="log-row sys">[SYSTEM]: Agent initialized. Waiting for remote job feeds...</div>
+          </div>
+        </div>
+
+        <div class="job-list-header">
+          <h3>Detected Openings</h3>
+          <span class="badge" id="job-feed-count">0 Jobs</span>
+        </div>
+        
+        <div class="job-list-container" id="feed-list">
+          <div class="empty-state">
+            <div class="empty-icon font-mono">∅</div>
+            <p>No jobs detected yet. Scraper is running in the background...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 2: Profile & Manual Upload (Middle Column) -->
+      <section class="panel-card glass" id="profile-panel">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="tab-resume">Resume Manager</button>
+          <button class="tab-btn" data-tab="tab-manual-jd">Manual Upload & Tailor</button>
+        </div>
+
+        <!-- Tab Content: Resume Manager -->
+        <div class="tab-content active" id="tab-resume">
+          <div class="form-scrollable">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label class="form-label" for="profile-name">Full Name</label>
+                <input type="text" id="profile-name" class="input-text" placeholder="John Doe">
+              </div>
+              <div class="form-group flex-1">
+                <label class="form-label" for="profile-email">Email Address</label>
+                <input type="email" id="profile-email" class="input-text" placeholder="john@example.com">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profile-title">Target Job Title(s)</label>
+              <input type="text" id="profile-title" class="input-text" placeholder="e.g. Software Engineer, Solutions Architect">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Upload Base Resume File (.pdf, .docx, .txt)</label>
+              <div class="file-dropzone" id="resume-dropzone">
+                <input type="file" id="upload-resume-file" accept=".pdf,.docx,.txt">
+                <div class="dropzone-icon">📥</div>
+                <p class="dropzone-title">Drag & drop your resume</p>
+                <p class="dropzone-subtitle" id="resume-file-info">Supports PDF, Word, and Plain Text</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="base-resume-text">Or Paste Base Resume Text</label>
+              <textarea id="base-resume-text" class="textarea-input" placeholder="Paste your clean resume text here... Include summary, work experience, and technical skills."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Active Tailored Resumes Cache</span>
+                <span class="badge" id="tailored-cache-count">0 / 5 Stored</span>
+              </label>
+              <div id="tailored-cache-list" class="tailored-cache-container" style="display:flex; flex-direction:column; gap:0.5rem; background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:8px; padding:0.6rem; max-height:160px; overflow-y:auto;">
+                <div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:0.5rem 0;">No active tailored resumes cached</div>
+              </div>
+              <p class="form-hint">Holds up to 5 optimized resumes. Resumes are deleted automatically once applied, or discarded (oldest first) if the cache exceeds 5.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Content: Manual Job Upload (External Jobs) -->
+        <div class="tab-content" id="tab-manual-jd">
+          <div class="form-scrollable">
+            <p class="section-intro">Have a specific remote job description from LinkedIn, Indeed, or another board? Upload it here to immediately tailor your resume and execute a submission simulation.</p>
+
+            <div class="form-group">
+              <label class="form-label" for="manual-company">Company Name</label>
+              <input type="text" id="manual-company" class="input-text" placeholder="e.g. Netflix, Stripe">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="manual-role">Role Title</label>
+              <input type="text" id="manual-role" class="input-text" placeholder="e.g. Senior Frontend Engineer">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="manual-category">Organization Sector</label>
+              <select id="manual-category" class="input-select">
+                <option value="Healthcare, Life Sciences & Public Sector">Healthcare, Life Sciences & Public Sector</option>
+                <option value="Big Tech, Cloud & Enterprise Platforms" selected>Big Tech, Cloud & Enterprise Platforms</option>
+                <option value="Consulting & Professional Services">Consulting & Professional Services</option>
+                <option value="Financial Services & Insurance">Financial Services & Insurance</option>
+                <option value="Manufacturing, Retail & Consumer">Manufacturing, Retail & Consumer</option>
+                <option value="Technology, Data Centers & Infrastructure">Technology, Data Centers & Infrastructure</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Upload Job Description File (.pdf, .docx, .txt)</label>
+              <div class="file-dropzone" id="jd-dropzone">
+                <input type="file" id="upload-jd-file" accept=".pdf,.docx,.txt">
+                <div class="dropzone-icon">📋</div>
+                <p class="dropzone-title">Drag & drop job description</p>
+                <p class="dropzone-subtitle" id="jd-file-info">Supports PDF, Word, and Plain Text</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="manual-jd-text">Or Paste Job Description Text</label>
+              <textarea id="manual-jd-text" class="textarea-input" placeholder="Paste the job description and requirements..."></textarea>
+            </div>
+
+            <button id="btn-tailor-manual" class="btn btn-primary w-full">
+              <span>Tailor Resume for Manual Job</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: AI Resume Tailorer & Auto-Apply (Right Column) -->
+      <section class="panel-card glass" id="tailor-panel">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="tab-tailor-diff">Resume Tailoring Engine</button>
+          <button class="tab-btn" data-tab="tab-apply-agent">Auto-Apply Agent</button>
+        </div>
+
+        <!-- Tab Content: Tailoring Diff -->
+        <div class="tab-content active" id="tab-tailor-diff">
+          <div class="panel-inner flex-col height-100">
+            <div class="tailor-header">
+              <div id="tailor-meta">
+                <span class="meta-label">Selected Job:</span>
+                <span id="tailor-job-title" class="meta-value">No Job Selected</span>
+              </div>
+              <button id="btn-tailor-selected" class="btn btn-primary" disabled>
+                <span>Tailor Resume</span>
+              </button>
+            </div>
+
+            <div class="diff-split-container flex-1">
+              <div class="diff-pane">
+                <div class="diff-pane-title">Original Base Resume</div>
+                <div class="diff-pane-body" id="diff-original">
+                  <div class="diff-placeholder">Upload or paste a resume in the profile manager to begin.</div>
+                </div>
+              </div>
+              
+              <div class="diff-pane">
+                <div class="diff-pane-title">AI-Tailored Resume</div>
+                <div class="diff-pane-body" id="diff-tailored">
+                  <div class="diff-placeholder">Ready to highlight AI optimizations (skills added, bullet points customized).</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tailor-actions">
+              <button id="btn-export-pdf" class="btn btn-secondary flex-1" disabled>
+                <span>Download Tailored PDF</span>
+              </button>
+              <button id="btn-apply-now" class="btn btn-accent flex-1" disabled>
+                <span>🚀 Simulate Immediate Apply</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Content: Auto-Apply Agent -->
+        <div class="tab-content" id="tab-apply-agent">
+          <div class="panel-inner flex-col height-100">
+            <div class="agent-dashboard">
+              <div class="agent-status-card">
+                <span class="agent-lbl">AGENT STATUS</span>
+                <div class="agent-state-container">
+                  <span id="agent-state-dot" class="state-dot state-idle">●</span>
+                  <span id="agent-state-text" class="agent-state font-mono">STANDBY</span>
+                </div>
+              </div>
+              <div class="agent-stat">
+                <span class="stat-lbl">Matched Skills Ratio</span>
+                <span id="agent-skills-ratio" class="stat-val font-mono">0%</span>
+              </div>
+            </div>
+
+            <div class="console-wrapper flex-1" style="margin-top: 1rem;">
+              <div class="console-log font-mono" id="apply-terminal">
+                <div class="log-row sys">[AGENT]: Ready for auto-apply instructions. Select a tailored job or enable Auto-Apply settings to begin.</div>
+              </div>
+            </div>
+            
+            <div class="submission-details" id="apply-submission-card" style="display:none;">
+              <h4>Last Application Submitted</h4>
+              <div class="sub-row">
+                <span class="sub-lbl">Company:</span>
+                <span id="sub-val-company" class="sub-val font-mono">-</span>
+              </div>
+              <div class="sub-row">
+                <span class="sub-lbl">Role:</span>
+                <span id="sub-val-role" class="sub-val font-mono">-</span>
+              </div>
+              <div class="sub-row">
+                <span class="sub-lbl">Timestamp:</span>
+                <span id="sub-val-time" class="sub-val font-mono">-</span>
+              </div>
+              <div class="sub-row">
+                <span class="sub-lbl">Custom Questions Answered:</span>
+                <span id="sub-val-questions" class="sub-val font-mono">0</span>
+              </div>
+              <div class="sub-row" style="margin-top: 0.6rem;">
+                <button id="btn-compose-email" class="btn btn-secondary w-full" style="font-size: 0.75rem; padding: 0.4rem 0.8rem; background: var(--primary-glow); border-color: rgba(99, 102, 241, 0.3);">
+                  <span>📧 Compose Notification Email</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Settings Modal (Glassmorphic Overlay) -->
+  <div class="modal-overlay" id="settings-modal" style="display:none;">
+    <div class="modal-card glass">
+      <div class="modal-header">
+        <h3>System Settings</h3>
+        <button id="btn-close-settings" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="settings-api-key">Gemini API Key</label>
+          <input type="password" id="settings-api-key" class="input-text font-mono" placeholder="AIzaSy...">
+          <p class="form-hint">Provide your Gemini API key to unlock real-time high-fidelity resume tailoring. Left empty, the system runs on a smart keyword-injected heuristic parser (Demo Mode).</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="settings-notification-email">Receipt Notification Email</label>
+          <input type="email" id="settings-notification-email" class="input-text font-mono" placeholder="willieekams@aol.com">
+          <p class="form-hint">The target email address that will receive detailed summaries and tailored resumes for any job applications completed by the agent.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="settings-poll-speed">Job Scraper Frequency (Seconds)</label>
+          <div class="range-container">
+            <input type="range" id="settings-poll-speed" min="15" max="120" step="5" value="30">
+            <span id="settings-poll-speed-val" class="font-mono">30s</span>
+          </div>
+          <p class="form-hint">Controls how quickly new remote jobs are detected and notified.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Target Jobsites / Career Portals</label>
+          <div class="jobsite-input-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="url" id="settings-jobsite-url" class="input-text flex-1" placeholder="e.g. https://careers.google.com" style="font-size: 0.82rem;">
+            <button type="button" id="btn-add-jobsite" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Add</button>
+          </div>
+          <div id="settings-jobsites-list" class="jobsites-list-container" style="max-height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.4rem 0.6rem; display: flex; flex-direction: column; gap: 0.4rem;">
+            <!-- Jobsites will be populated dynamically -->
+          </div>
+          <p class="form-hint">Configure specific job board or career page links that the AI agent will target and scan.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Auto-Apply Toggles (By Organization Sector)</label>
+          <div class="toggles-grid">
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-hlp" checked>
+              <span class="toggle-label">Healthcare, Life Sciences & Public Sector</span>
+            </label>
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-btc" checked>
+              <span class="toggle-label">Big Tech, Cloud & Enterprise Platforms</span>
+            </label>
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-cps" checked>
+              <span class="toggle-label">Consulting & Professional Services</span>
+            </label>
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-fsi" checked>
+              <span class="toggle-label">Financial Services & Insurance</span>
+            </label>
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-mrc" checked>
+              <span class="toggle-label">Manufacturing, Retail & Consumer</span>
+            </label>
+            <label class="toggle-control">
+              <input type="checkbox" id="toggle-tdi" checked>
+              <span class="toggle-label">Technology, Data Centers & Infrastructure</span>
+            </label>
+          </div>
+          <p class="form-hint">When a job is detected in checked sectors, the agent will automatically trigger resume tailoring and submit an application immediately.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn btn-primary w-full">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job Feed JavaScript Data -->
+  <script src="jobsData.js"></script>
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

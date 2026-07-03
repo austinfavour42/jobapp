@@ -1,0 +1,16 @@
+{
+  "name": "job-tailor-applicator",
+  "version": "1.0.0",
+  "description": "AutoApply AI: Remote Job Applicator & Resume Tailorer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
