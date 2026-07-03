@@ -396,8 +396,64 @@
           <p class="form-hint">When a job is detected in checked sectors, the agent will automatically trigger resume tailoring and submit an application immediately.</p>
         </div>
       </div>
-      <div class="modal-footer">
-        <button id="btn-save-settings" class="btn btn-primary w-full">Save Changes</button>
+      <div class="modal-footer" style="display:flex; gap:0.5rem;">
+        <button id="btn-logout" class="btn btn-secondary" style="background:var(--danger-glow); color:var(--danger); border-color:rgba(235,80,90,0.25);">Log Out</button>
+        <button id="btn-save-settings" class="btn btn-primary" style="flex:1;">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Authentication Overlay -->
+  <div id="auth-overlay" class="auth-overlay-container">
+    <div class="auth-card glass">
+      <div class="auth-header">
+        <div class="logo-circle">⚡</div>
+        <h2>AutoApply AI</h2>
+        <p id="auth-subtitle">Create your account to start auto-applying</p>
+      </div>
+
+      <!-- Signup Pane -->
+      <div id="pane-signup" class="auth-pane active">
+        <div class="form-group">
+          <label class="form-label" for="signup-email">Email Address</label>
+          <input type="email" id="signup-email" class="input-text" placeholder="name@domain.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-password">Password</label>
+          <input type="password" id="signup-password" class="input-text" placeholder="••••••••" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-phone">Phone Number</label>
+          <input type="tel" id="signup-phone" class="input-text" placeholder="+1 (555) 000-0000" required>
+        </div>
+        <button id="btn-submit-signup" class="btn btn-primary w-full">Sign Up & Verify Email</button>
+        <p class="auth-switch">Already have an account? <a href="#" id="link-goto-login">Log In</a></p>
+      </div>
+
+      <!-- Verification Pane -->
+      <div id="pane-verify" class="auth-pane">
+        <p class="verify-desc" style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem; line-height:1.4;">We have opened your email client to send a 6-digit verification code to <strong id="verify-target-email" style="color:var(--secondary);"></strong>. Please copy it into the input below.</p>
+        <div class="form-group">
+          <label class="form-label" for="verify-code">Verification Code</label>
+          <input type="text" id="verify-code" class="input-text font-mono" placeholder="123456" maxlength="6" style="text-align:center; font-size:1.5rem; letter-spacing:0.3rem;" required>
+        </div>
+        <button id="btn-submit-verify" class="btn btn-primary w-full">Verify Code & Complete Sign Up</button>
+        <p class="auth-switch"><a href="#" id="link-resend-code" style="color:var(--secondary);">Resend verification email</a></p>
+        <p class="auth-switch"><a href="#" id="link-verify-back" style="color:var(--text-muted);">← Back to Sign Up</a></p>
+      </div>
+
+      <!-- Login Pane -->
+      <div id="pane-login" class="auth-pane">
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email Address</label>
+          <input type="email" id="login-email" class="input-text" placeholder="name@domain.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <input type="password" id="login-password" class="input-text" placeholder="••••••••" required>
+        </div>
+        <button id="btn-submit-login" class="btn btn-primary w-full">Log In</button>
+        <p class="auth-switch">Don't have an account? <a href="#" id="link-goto-signup">Sign Up</a></p>
       </div>
     </div>
   </div>

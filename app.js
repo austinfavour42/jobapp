@@ -10,7 +10,9 @@ const STORAGE_KEYS = {
   NOTIFICATION_EMAIL: 'autoapply_notification_email',
   TAILORED_CACHE: 'autoapply_tailored_cache',
   LAST_CLEAR: 'autoapply_last_clear_timestamp',
-  THEME: 'autoapply_theme'
+  THEME: 'autoapply_theme',
+  USERS_DB: 'autoapply_users_db',
+  CURRENT_USER: 'autoapply_current_user'
 };
 
 // Initial state defaults
@@ -75,7 +77,11 @@ Cloud Infrastructure Engineer | TechLink Services | 2020 - 2023
   selectedJobId: null,
   tailoredCache: JSON.parse(localStorage.getItem(STORAGE_KEYS.TAILORED_CACHE)) || [],
   lastClearTimestamp: parseInt(localStorage.getItem(STORAGE_KEYS.LAST_CLEAR)) || Date.now(),
-  theme: localStorage.getItem(STORAGE_KEYS.THEME) || 'dark'
+  theme: localStorage.getItem(STORAGE_KEYS.THEME) || 'dark',
+  usersDb: JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS_DB)) || [],
+  currentUser: JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) || null,
+  tempVerificationCode: null,
+  tempUser: null
 };
 
 // Global variables for scrapers
@@ -113,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (themeIcon) themeIcon.innerText = '☀️';
   }
 
+  checkUserSession();
   initUIValues();
   setupEventListeners();
   initNotificationPermission();
@@ -199,6 +206,8 @@ function saveStateToStorage() {
   localStorage.setItem(STORAGE_KEYS.TAILORED_CACHE, JSON.stringify(state.tailoredCache));
   localStorage.setItem(STORAGE_KEYS.LAST_CLEAR, state.lastClearTimestamp.toString());
   localStorage.setItem(STORAGE_KEYS.THEME, state.theme);
+  localStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(state.usersDb));
+  localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
   updateMetricsUI();
 }
 
@@ -224,6 +233,142 @@ function checkAndPerform24HourReset() {
     renderJobsFeedList();
     updateMetricsUI();
     
+    playNotificationSound('notify');
+  }
+}
+
+// User Authentication System Logic
+function checkUserSession() {
+  const overlay = document.getElementById('auth-overlay');
+  if (state.currentUser) {
+    overlay.classList.add('hidden');
+    
+    // Auto populate profile input values in dashboard
+    document.getElementById('profile-email').value = state.currentUser.email;
+    state.profile.email = state.currentUser.email;
+    
+    // Guess name from email address
+    const defaultName = state.currentUser.email.split('@')[0].replace(/[^a-zA-Z]/g, ' ');
+    const formattedName = defaultName.charAt(0).toUpperCase() + defaultName.slice(1);
+    document.getElementById('profile-name').value = formattedName;
+    state.profile.name = formattedName;
+    
+    saveStateToStorage();
+  } else {
+    overlay.classList.remove('hidden');
+    switchAuthPane('pane-signup', 'Create your account to start auto-applying');
+  }
+}
+
+function switchAuthPane(paneId, subtitleText = '') {
+  document.querySelectorAll('.auth-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(paneId).classList.add('active');
+  if (subtitleText) {
+    document.getElementById('auth-subtitle').innerText = subtitleText;
+  }
+}
+
+function sendVerificationEmail(email, code) {
+  const subject = encodeURIComponent("Verify your AutoApply AI Account");
+  const body = encodeURIComponent(`Hello,\n\nThank you for signing up for AutoApply AI!\n\nYour 6-digit email verification code is: ${code}\n\nPlease enter this code in the verification screen to complete your registration.\n\nBest regards,\nAutoApply AI Registration Agent`);
+  
+  // Programmatically launch mail client draft
+  window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+  writeLog('log-terminal', `[AUTH]: Verification code generated for ${email}. Email client verification draft opened.`, 'alert');
+}
+
+function handleSignUp() {
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const phone = document.getElementById('signup-phone').value.trim();
+
+  if (!email || !password || !phone) {
+    alert('Please fill out all fields to register.');
+    return;
+  }
+
+  // Validate email domain structure
+  if (!/\S+@\S+\.\S+/.test(email)) {
+    alert('Please enter a valid email address.');
+    return;
+  }
+
+  // Check if already exists in DB
+  const exists = state.usersDb.some(u => u.email.toLowerCase() === email.toLowerCase());
+  if (exists) {
+    alert('This email address is already registered. Please Log In.');
+    return;
+  }
+
+  // Generate secure code and store registration temp data
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  state.tempVerificationCode = code;
+  state.tempUser = { email, password, phone };
+
+  // Dispatch mock SMTP verification via email client redirect
+  sendVerificationEmail(email, code);
+
+  // Transition to Verification screen
+  document.getElementById('verify-target-email').innerText = email;
+  switchAuthPane('pane-verify', 'Account Verification Required');
+}
+
+function handleVerification() {
+  const code = document.getElementById('verify-code').value.trim();
+  if (!code) {
+    alert('Please enter the verification code sent to your email.');
+    return;
+  }
+
+  if (code === state.tempVerificationCode) {
+    // Add to DB
+    state.usersDb.push(state.tempUser);
+    state.currentUser = state.tempUser;
+    
+    // Clear temp values
+    state.tempUser = null;
+    state.tempVerificationCode = null;
+
+    saveStateToStorage();
+    checkUserSession();
+    
+    writeLog('log-terminal', `[AUTH]: Secure email verification matches. Account successfully verified.`, 'success');
+    playNotificationSound('success');
+  } else {
+    alert('Invalid verification code. Please check your email client or resend the code.');
+  }
+}
+
+function handleLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!email || !password) {
+    alert('Please fill in all fields.');
+    return;
+  }
+
+  const user = state.usersDb.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+  if (user) {
+    state.currentUser = user;
+    saveStateToStorage();
+    checkUserSession();
+    writeLog('log-terminal', `[AUTH]: User logged in: ${user.email}`, 'success');
+    playNotificationSound('success');
+  } else {
+    alert('Invalid email or password. Please verify details or sign up.');
+  }
+}
+
+function handleLogOut() {
+  if (confirm('Are you sure you want to log out of your AutoApply AI session?')) {
+    state.currentUser = null;
+    saveStateToStorage();
+    checkUserSession();
+    
+    // Reset metrics & UI view components
+    document.getElementById('settings-modal').style.display = 'none';
+    writeLog('log-terminal', `[AUTH]: Session terminated. User logged out.`, 'info');
     playNotificationSound('notify');
   }
 }
@@ -827,6 +972,35 @@ function setupEventListeners() {
   
   // Add Jobsite Button
   document.getElementById('btn-add-jobsite').addEventListener('click', addJobsite);
+
+  // Auth system listeners
+  document.getElementById('link-goto-login').addEventListener('click', (e) => {
+    e.preventDefault();
+    switchAuthPane('pane-login', 'Log in to your account');
+  });
+
+  document.getElementById('link-goto-signup').addEventListener('click', (e) => {
+    e.preventDefault();
+    switchAuthPane('pane-signup', 'Create your account to start auto-applying');
+  });
+
+  document.getElementById('link-verify-back').addEventListener('click', (e) => {
+    e.preventDefault();
+    switchAuthPane('pane-signup', 'Create your account to start auto-applying');
+  });
+
+  document.getElementById('link-resend-code').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (state.tempUser) {
+      sendVerificationEmail(state.tempUser.email, state.tempVerificationCode);
+      alert('Verification code resent to email client.');
+    }
+  });
+
+  document.getElementById('btn-submit-signup').addEventListener('click', handleSignUp);
+  document.getElementById('btn-submit-verify').addEventListener('click', handleVerification);
+  document.getElementById('btn-submit-login').addEventListener('click', handleLogin);
+  document.getElementById('btn-logout').addEventListener('click', handleLogOut);
 
   // Resume Base Input save
   document.getElementById('base-resume-text').addEventListener('input', (e) => {

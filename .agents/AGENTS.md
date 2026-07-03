@@ -12,6 +12,7 @@ This directory contains the rules and behavioral constraints for the **AutoApply
 - **Active Cache (Max 5)**: Store up to 5 tailored resumes. Evict the oldest on overflow, and delete the resume from the cache immediately upon application success.
 - **Email Receipts**: Launch native email drafts programmatically on application completion using the email in settings (defaults to `willieekams@aol.com`).
 - **24-Hour Reset Cycle**: Clear active cache, applied history, and metrics when 24 hours have elapsed.
+- **User Authentication**: Restricts dashboard access using a glassmorphic Auth overlay. Users must register with Email, Password, and Phone. Verification is completed by generating a 6-digit code and opening the user's native email client with the code to verify. Persist users and sessions in local storage. Include a Log Out function.
 
 ## 3. Tech Stack & Styling
 - Pure HTML, CSS (no TailwindCSS), and Vanilla JavaScript.
